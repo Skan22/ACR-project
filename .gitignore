@@ -1,5 +1,6 @@
 .venv/
 annotation/
-data/
+
 audio_mono-mic/
 *.ipynb
+*.csv
