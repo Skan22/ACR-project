@@ -6,7 +6,7 @@ import os
 SAMPLE_RATE = 22050  # Standard for audio analysis
 HOP_LENGTH = 2048      # ~100ms per frame at 22050 Hz
 FRAME_DURATION = HOP_LENGTH / SAMPLE_RATE  # Duration of each frame in seconds
-
+ROOTS = ["A","A#","B","C","C#","D","D#","E","F","F#","G","G#"] # Roots for chords giving a total of 24 classes of maj/min
 
 
 #Cleaning : Only keeping Comp tracks for ACR 
@@ -19,6 +19,22 @@ def delete_solo_tracks(folder_path):
 delete_solo_tracks(Path("./annotation"))
 delete_solo_tracks(Path("./audio_mono-mic"))
 
+#Chord Mapping into Major/Minor 
+def simplify_chord(chord):
+    try:
+        root, suffix = chord.split(":")
+        if suffix in ["maj", "7", "maj7"]:
+            return f"{root}:maj"
+        elif suffix in ["min", "hdim7", "dim", "dim7", "min7"]:
+            return f"{root}:min"
+        #to modify in the future in case of additions
+        else:
+            return f"{root}:{suffix}" 
+            
+    except ValueError:
+        print("error")
+        # Handles cases where there is no colon in the string
+        return chord
 #Framing time Stamps
 def parse_file(annot_file_path,name):
     with open(annot_file_path ,"r") as f : 
@@ -35,7 +51,7 @@ def parse_file(annot_file_path,name):
                         'name' : name,
                         'start': i/SAMPLE_RATE,
                         'end': i/SAMPLE_RATE + FRAME_DURATION,
-                        'chord': data['value']
+                        'chord': simplify_chord(data['value'])
                     })
                 
             break
