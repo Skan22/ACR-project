@@ -11,6 +11,9 @@ ROOTS = ["A","A#","B","C","C#","D","D#","E","F","F#","G","G#"] # Roots for chord
 TARGET_COUNT = 1200
 AUGMENT_THRESHHOLD = 800
 TRUNCATING_THRESHHOLD = 1600 
+ALL_CHORDS = [f"{r}:maj" for r in ROOTS] + [f"{r}:min" for r in ROOTS]
+ROOT_TO_IDX = {r: i for i, r in enumerate(ROOTS)}
+IDX_TO_ROOT = {i: r for i, r in enumerate(ROOTS)}
 
 #Cleaning : Only keeping Comp tracks for ACR 
 def delete_solo_tracks(folder_path):
@@ -36,6 +39,18 @@ def simplify_chord(chord):
         print("error")
         # Handles cases where there is no colon in the string
         return chord
+
+def transpose_chord(chord: str, semitones: int) -> str:
+    """
+    Transpose a simplified chord (Root:maj/min) by semitones (mod 12).
+    Quality is preserved.
+    """
+    chord = simplify_chord(chord)
+    root, suffix = chord.split(":")
+    if root not in ROOT_TO_IDX:
+        raise ValueError(f"Unknown root '{root}' in chord '{chord}'")
+    new_root = IDX_TO_ROOT[(ROOT_TO_IDX[root] + semitones) % 12]
+    return f"{new_root}:{suffix}"
 
 #Framing time Stamps
 def parse_and_frame_file(annot_file_path,name):
@@ -96,18 +111,18 @@ def calculate_truncation_needed(chord_counts):
                 'trunc_needed': trunc_needed,
                 # 'multiplier': max(1, int(np.ceil(trunc_needed / count)))
             }
-
+    return truncation_needed
 
 
 
 
 #-------- Main Program Exec ---------------
 
-print("----Cleaning Solo tracks----")
+print("Cleaning Solo tracks........")
 delete_solo_tracks(Path("./annotation"))
 delete_solo_tracks(Path("./audio_mono-mic"))
 
-print("----Framing TimeStamps------")
+print("Framing TimeStamps.......")
 for folder in Path("./annotation").iterdir():
     Total_data =[]
     for file in folder.iterdir():
@@ -117,7 +132,6 @@ for folder in Path("./annotation").iterdir():
     df = pd.DataFrame(Total_data)
     os.makedirs(os.path.dirname(f"./Data/{folder.name}/"), exist_ok=True)
     df.to_csv(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
-    print(f"Class counts for {folder.name} Data  : \n")
     count = class_count(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
-    print(count)
-    print("\n")
+    aug_needed = calculate_augmentations_needed(count)
+    trunc_needed = calculate_truncation_needed(count)
