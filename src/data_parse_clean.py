@@ -16,8 +16,6 @@ def delete_solo_tracks(folder_path):
             if jams.name.find("solo")!=-1:
                 print(f"deleting jams{jams.name}")
                 jams.unlink(missing_ok=True)
-delete_solo_tracks(Path("./annotation"))
-delete_solo_tracks(Path("./audio_mono-mic"))
 
 #Chord Mapping into Major/Minor 
 def simplify_chord(chord):
@@ -35,6 +33,7 @@ def simplify_chord(chord):
         print("error")
         # Handles cases where there is no colon in the string
         return chord
+
 #Framing time Stamps
 def parse_file(annot_file_path,name):
     with open(annot_file_path ,"r") as f : 
@@ -57,6 +56,18 @@ def parse_file(annot_file_path,name):
             break
 
     return chord_data 
+
+
+
+
+
+#-------- Main Program Exec ---------------
+
+print("Cleaning Solo tracks")
+delete_solo_tracks(Path("./annotation"))
+delete_solo_tracks(Path("./audio_mono-mic"))
+
+print("Framing TimeStamps")
 for folder in Path("./annotation").iterdir():
     Total_data =[]
     for file in folder.iterdir():
@@ -65,4 +76,4 @@ for folder in Path("./annotation").iterdir():
         Total_data+=data
     df = pd.DataFrame(Total_data)
     os.makedirs(os.path.dirname(f"./Data/{folder.name}/"), exist_ok=True)
-    df.to_csv(f"./Data/{folder.name}/{folder.name}_data.csv")
+    df.to_csv(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
