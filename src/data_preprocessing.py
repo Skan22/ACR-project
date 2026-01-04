@@ -40,11 +40,7 @@ def simplify_chord(chord):
         # Handles cases where there is no colon in the string
         return chord
 
-def transpose_chord(chord: str, semitones: int) -> str:
-    """
-    Transpose a simplified chord (Root:maj/min) by semitones (mod 12).
-    Quality is preserved.
-    """
+def transpose_chord(chord, semitones):
     chord = simplify_chord(chord)
     root, suffix = chord.split(":")
     if root not in ROOT_TO_IDX:
