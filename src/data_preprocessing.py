@@ -3,9 +3,10 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import os
+import librosa
 #Config :  
 SAMPLE_RATE = 22050  # Standard for audio analysis
-HOP_LENGTH = 2048      # ~100ms per frame at 22050 Hz
+HOP_LENGTH = 2048 *4     # ~371ms per frame at 22050 Hz
 FRAME_DURATION = HOP_LENGTH / SAMPLE_RATE  # Duration of each frame in seconds
 ROOTS = ["A","A#","B","C","C#","D","D#","E","F","F#","G","G#"] # Roots for chords giving a total of 24 classes of maj/min
 TARGET_COUNT = 1200
@@ -80,35 +81,8 @@ def class_count(frame_csv_file_path):
             chord_count[simplify_chord(row["chord"])]=1
         else: 
             chord_count[simplify_chord(row["chord"])]+=1
+            chord_count = dict(sorted(chord_count.items(), key=lambda item: item[1], reverse=True))
     return chord_count
-
-
-def calculate_augmentations_needed(chord_counts) :
-        augmentations_needed = {}
-        for chord,count in chord_counts.items():
-            if count < AUGMENT_THRESHHOLD:
-                # Calculate multiplier needed to reach target
-                aug_needed = TARGET_COUNT - count
-                augmentations_needed[chord] = {
-                    'current': count,
-                    'aug_needed': aug_needed,
-                    # 'multiplier': max(1, int(np.ceil(aug_needed / count)))
-                }
-        
-        return augmentations_needed
-
-def calculate_truncation_needed(chord_counts):
-    truncation_needed = {}
-    for chord,count in chord_counts.items():
-        if count > TRUNCATING_THRESHHOLD:
-            trunc_needed =  count  - TRUNCATING_THRESHHOLD
-            truncation_needed[chord] = {
-                'current': count,
-                'trunc_needed': trunc_needed,
-                # 'multiplier': max(1, int(np.ceil(trunc_needed / count)))
-            }
-    return truncation_needed
-
 
 
 
@@ -129,5 +103,8 @@ for folder in Path("./annotation").iterdir():
     os.makedirs(os.path.dirname(f"./Data/{folder.name}/"), exist_ok=True)
     df.to_csv(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
     count = class_count(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
-    aug_needed = calculate_augmentations_needed(count)
-    trunc_needed = calculate_truncation_needed(count)
+    print(f"{folder.name} count : \n”")
+    print(count)
+
+
+
