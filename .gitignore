@@ -4,3 +4,5 @@ annotation/
 audio_mono-mic/
 *.ipynb
 *.csv
+*.wav
+*.zip
