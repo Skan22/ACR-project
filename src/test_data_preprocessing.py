@@ -8,10 +8,9 @@ SAMPLE_RATE = 22050  # Standard for audio analysis
 HOP_LENGTH = 2048      # ~100ms per frame at 22050 Hz
 FRAME_DURATION = HOP_LENGTH / SAMPLE_RATE  # Duration of each frame in seconds
 ROOTS = ["A","A#","B","C","C#","D","D#","E","F","F#","G","G#"] # Roots for chords giving a total of 24 classes of maj/min
-TARGET_COUNT = 1200
-AUGMENT_THRESHHOLD = 800
-TRUNCATING_THRESHHOLD = 1600 
-ALL_CHORDS = [f"{r}:maj" for r in ROOTS] + [f"{r}:min" for r in ROOTS]
+MAJOR_CHORDS = [f"{r}:maj" for r in ROOTS]
+MINOR_CHORDS = [f"{r}:min" for r in ROOTS]
+ALL_CHORDS = MAJOR_CHORDS+MINOR_CHORDS
 ROOT_TO_IDX = {r: i for i, r in enumerate(ROOTS)}
 IDX_TO_ROOT = {i: r for i, r in enumerate(ROOTS)}
 
