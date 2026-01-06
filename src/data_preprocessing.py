@@ -3,10 +3,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import os
-import librosa
 #Config :  
 SAMPLE_RATE = 22050  # Standard for audio analysis
-HOP_LENGTH = 2048 *4     # ~371ms per frame at 22050 Hz
+HOP_LENGTH = 2048      # ~100ms per frame at 22050 Hz
 FRAME_DURATION = HOP_LENGTH / SAMPLE_RATE  # Duration of each frame in seconds
 ROOTS = ["A","A#","B","C","C#","D","D#","E","F","F#","G","G#"] # Roots for chords giving a total of 24 classes of maj/min
 TARGET_COUNT = 1200
@@ -81,10 +80,9 @@ def class_count(frame_csv_file_path):
             chord_count[simplify_chord(row["chord"])]=1
         else: 
             chord_count[simplify_chord(row["chord"])]+=1
-            chord_count = dict(sorted(chord_count.items(), key=lambda item: item[1], reverse=True))
     return chord_count
 
-zs
+
 
 #-------- Main Program Exec ---------------
 
@@ -103,8 +101,3 @@ for folder in Path("./annotation").iterdir():
     os.makedirs(os.path.dirname(f"./Data/{folder.name}/"), exist_ok=True)
     df.to_csv(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
     count = class_count(f"./Data/{folder.name}/Framed_{folder.name}_data.csv")
-    print(f"{folder.name} count : \n”")
-    print(count)
-
-
-
