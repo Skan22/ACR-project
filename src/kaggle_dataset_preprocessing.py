@@ -66,9 +66,7 @@ for folder in train_dir.iterdir():
             print("Creating folder ")
             new_folder_path.mkdir(parents=True, exist_ok=True)
             print(f"Created folder: {new_folder_path}")
-            count=0
             for sound_file in folder.iterdir():
-                count+=1
                 transpose_sound_file(train_dir,sound_file.name,shift)
-                print(count)
+
 
