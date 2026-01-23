@@ -58,26 +58,8 @@ class ChordCQTDataset(Dataset):
         # Collect all audio files and their labels
         self.samples: List[Tuple[Path, int]] = []
         self._load_samples()
-        
-    def _load_samples(self):
-        """Load all audio file paths and their corresponding labels."""
-        for chord_folder in self.data_dir.iterdir():
-            if not chord_folder.is_dir():
-                continue
-            
-            chord_name = chord_folder.name
-            if chord_name not in CHORD_TO_IDX:
-                print(f"Warning: Unknown chord folder '{chord_name}', skipping...")
-                continue
-                
-            label = CHORD_TO_IDX[chord_name]
-            
-            for audio_file in chord_folder.iterdir():
-                if audio_file.suffix.lower() in ['.wav', '.mp3', '.flac', '.ogg']:
-                    self.samples.append((audio_file, label))
-        
-        print(f"Loaded {len(self.samples)} samples from {self.data_dir}")
-    
+
+
     def _compute_cqt(self, audio_path: Path) -> np.ndarray:
         """Compute the Constant Q Transform of an audio file."""
         # Load audio
@@ -102,26 +84,35 @@ class ChordCQTDataset(Dataset):
         # Convert to magnitude (absolute value) and then to dB scale
         cqt_mag = np.abs(cqt)
         cqt_db = librosa.amplitude_to_db(cqt_mag, ref=np.max)
+        cqt_tensor = torch.tensor(cqt_db, dtype=torch.float32).unsqueeze(0)  # Shape: (1, n_bins, time_frames)
         
-        return cqt_db
+        return cqt_tensor
+
+
+    def _load_samples(self):
+        """Load all audio file paths and their corresponding labels."""
+        for chord_folder in self.data_dir.iterdir():
+
+            chord_name = chord_folder.name
+            if chord_name not in CHORD_TO_IDX:
+                print(f"Warning: Unknown chord folder '{chord_name}', skipping...")
+                continue
+            label = CHORD_TO_IDX[chord_name]
+            print("Computing CQT for :",chord_folder)
+            for audio_file in chord_folder.iterdir():
+                
+                if audio_file.suffix.lower() in ['.wav', '.mp3', '.flac', '.ogg']:
+
+                    self.samples.append((self._compute_cqt(audio_file), label))
+
+        
+        print(f"Loaded {len(self.samples)} samples from {self.data_dir}")
     
     def __len__(self) -> int:
         return len(self.samples)
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        audio_path, label = self.samples[idx]
-        
-        # Check cache first
-        if self.cache_cqt and idx in self.cache:
-            cqt = self.cache[idx]
-        else:
-            cqt = self._compute_cqt(audio_path)
-            if self.cache_cqt:
-                self.cache[idx] = cqt
-        
-        # Convert to tensor and add channel dimension (for CNN compatibility)
-        cqt_tensor = torch.tensor(cqt, dtype=torch.float32).unsqueeze(0)  # Shape: (1, n_bins, time_frames)
-        
+        cqt_tensor, label = self.samples[idx]  
         # Apply optional transform
         if self.transform:
             cqt_tensor = self.transform(cqt_tensor)
@@ -292,48 +283,3 @@ class ChordCNNWithAttention(nn.Module):
     def count_parameters(self) -> int:
         """Count total trainable parameters."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-
-if __name__ == "__main__":
-
-    
-    # Example usage
-    train_loader, test_loader = create_dataloaders(
-        batch_size=32,
-        num_workers=0,  # Set to 0 for debugging
-        cache_cqt=False
-    )
-    model = ChordCNNWithAttention()
-    print("number of params :",model.count_parameters())
-    # Test a single batch
-    for cqt_batch, labels in train_loader:
-        print(f"Batch CQT shape: {cqt_batch.shape}")  # (batch_size, 1, n_bins, time_frames)
-        print(f"Labels shape: {labels.shape}")  # (batch_size,)
-        print(f"Labels: {[IDX_TO_CHORD[l.item()] for l in labels[:5]]}")
-        
-        # Visualize first 6 CQT spectrograms from the batch
-        fig, axes = plt.subplots(2, 3, figsize=(15, 8))
-        axes = axes.flatten()
-        
-        for i in range(min(6, cqt_batch.shape[0])):
-            cqt = cqt_batch[i, 0].numpy()  # Remove channel dimension
-            chord_name = IDX_TO_CHORD[labels[i].item()]
-            
-            im = axes[i].imshow(
-                cqt,
-                aspect='auto',
-                origin='lower',
-                cmap='magma',
-                interpolation='nearest'
-            )
-            axes[i].set_title(f"Chord: {chord_name}", fontsize=12)
-            axes[i].set_xlabel("Time Frames")
-            axes[i].set_ylabel("CQT Bins")
-            plt.colorbar(im, ax=axes[i], label='dB')
-        
-        plt.suptitle("CQT Spectrograms from Training Batch", fontsize=14)
-        plt.tight_layout()
-        plt.savefig("cqt_visualization.png", dpi=150)
-        plt.show()
-        
-        break
