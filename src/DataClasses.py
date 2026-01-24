@@ -23,37 +23,50 @@ class ChordCQTDataset(Dataset):
     """
     PyTorch Dataset for chord classification using Constant Q Transform (CQT).
     
+    Loads data from multiple sources in the Data directory:
+    - Data/Kaggle_data/{split}/
+    - Data/GuitarSet_Data/{split}/
+    
     Args:
-        data_dir: Path to the data directory (e.g., './Data/Training' or './Data/Test')
+        data_dir: Path to the base Data directory (e.g., './Data')
+        split: Data split to use ('Training' or 'Test')
         n_bins: Number of frequency bins for CQT (default: 72 for 6 octaves)
         hop_length: Hop length for CQT computation
         bins_per_octave: Number of bins per octave (default: 12 for semitone resolution)
         fmin: Minimum frequency (default: C2 ~65.4 Hz)
         transform: Optional transform to apply to the CQT output
-        cache_cqt: Whether to cache CQT computations in memory (faster but uses more RAM)
         use_hpss: Whether to apply Harmonic-Percussive Source Separation before CQT
+        use_kaggle: Whether to load data from Kaggle_data directory
+        use_guitarset: Whether to load data from GuitarSet_Data directory
     """
     
     def __init__(
         self,
         data_dir: str | Path,
+        split: str ,
         n_bins: int = 72,
         hop_length: int = 512,
         bins_per_octave: int = 12,
         fmin: Optional[float] = None,
         transform: Optional[callable] = None,
-        cache_cqt: bool = False,
-        use_hpss: bool = True
+        use_hpss: bool = True,
+        use_kaggle: bool = True,
+        use_guitarset: bool = True
     ):
         self.data_dir = Path(data_dir)
+        self.split = split
         self.n_bins = n_bins
         self.hop_length = hop_length
         self.bins_per_octave = bins_per_octave
         self.fmin = fmin if fmin is not None else librosa.note_to_hz('C2')
         self.transform = transform
-        self.cache_cqt = cache_cqt
         self.use_hpss = use_hpss
-        self.cache = {}
+        self.use_kaggle = use_kaggle
+        self.use_guitarset = use_guitarset
+        
+        # Define source directories
+        self.kaggle_dir = self.data_dir / "Kaggle_data" / split
+        self.guitarset_dir = self.data_dir / "GuitarSet_Data" / split
         
         # Collect all audio files and their labels
         self.samples: List[Tuple[Path, int]] = []
@@ -88,25 +101,48 @@ class ChordCQTDataset(Dataset):
         
         return cqt_tensor
 
-
-    def _load_samples(self):
-        """Load all audio file paths and their corresponding labels."""
-        for chord_folder in self.data_dir.iterdir():
-
+    def _load_from_directory(self, data_dir: Path, source_name: str):
+        """Load samples from a specific directory."""
+        count = 0
+        for chord_folder in data_dir.iterdir():
+            if not chord_folder.is_dir():
+                continue
+                
             chord_name = chord_folder.name
             if chord_name not in CHORD_TO_IDX:
                 print(f"Warning: Unknown chord folder '{chord_name}', skipping...")
                 continue
             label = CHORD_TO_IDX[chord_name]
-            print("Computing CQT for :",chord_folder)
+            print(f"Computing CQT for: {chord_folder} ({source_name})")
             for audio_file in chord_folder.iterdir():
                 
                 if audio_file.suffix.lower() in ['.wav', '.mp3', '.flac', '.ogg']:
-
                     self.samples.append((self._compute_cqt(audio_file), label))
+                    count += 1
 
+        print(f"Loaded {count} samples from {data_dir} ({source_name})")
+
+
+
+    def _load_samples(self):
+        """Load all audio file paths and their corresponding labels."""
+        # Load from Kaggle data directory if enabled
+        if self.use_kaggle:
+            if self.kaggle_dir.exists():
+                self._load_from_directory(self.kaggle_dir, "Kaggle_data")
+            else:
+                print(f"Warning: Kaggle data directory not found: {self.kaggle_dir}")
         
-        print(f"Loaded {len(self.samples)} samples from {self.data_dir}")
+        # Load from GuitarSet directory if enabled
+        if self.use_guitarset:
+            if self.guitarset_dir.exists():
+                self._load_from_directory(self.guitarset_dir, "GuitarSet_Data")
+            else:
+                print(f"Warning: GuitarSet directory not found: {self.guitarset_dir}")
+        
+        print(f"Total loaded: {len(self.samples)} samples")
+    
+
     
     def __len__(self) -> int:
         return len(self.samples)
@@ -128,48 +164,52 @@ class ChordCQTDataset(Dataset):
 
 
 def create_dataloaders(
-    train_dir: str | Path = "./Data/Training",
-    test_dir: str | Path = "./Data/Test",
+    data_dir: str | Path = "./Data",
     batch_size: int = 32,
     num_workers: int = 4,
     pin_memory: bool = True,
     n_bins: int = 84,
     hop_length: int = 512,
     bins_per_octave: int = 12,
-    cache_cqt: bool = False
+    use_kaggle: bool = True,
+    use_guitarset: bool = True
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Create training and test DataLoaders for chord classification.
     
     Args:
-        train_dir: Path to training data directory
-        test_dir: Path to test data directory
+        data_dir: Path to base Data directory containing Kaggle_data and GuitarSet_Data
         batch_size: Batch size for training
         num_workers: Number of worker processes for data loading
         pin_memory: Whether to pin memory for faster GPU transfer
         n_bins: Number of CQT frequency bins
         hop_length: Hop length for CQT
         bins_per_octave: Number of bins per octave for CQT
-        cache_cqt: Whether to cache CQT computations
+        use_kaggle: Whether to include Kaggle data
+        use_guitarset: Whether to include GuitarSet data
         
     Returns:
         Tuple of (train_dataloader, test_dataloader)
     """
     # Create datasets
     train_dataset = ChordCQTDataset(
-        data_dir=train_dir,
+        data_dir=data_dir,
+        split="Training",
         n_bins=n_bins,
         hop_length=hop_length,
         bins_per_octave=bins_per_octave,
-        cache_cqt=cache_cqt
+        use_kaggle=use_kaggle,
+        use_guitarset=use_guitarset
     )
     
     test_dataset = ChordCQTDataset(
-        data_dir=test_dir,
+        data_dir=data_dir,
+        split="Test",
         n_bins=n_bins,
         hop_length=hop_length,
         bins_per_octave=bins_per_octave,
-        cache_cqt=cache_cqt
+        use_kaggle=use_kaggle,
+        use_guitarset=use_guitarset
     )
     
     # Create dataloaders
@@ -196,90 +236,3 @@ def create_dataloaders(
     
     return train_loader, test_loader
 
-class ChordCNNWithAttention(nn.Module):
-    """
-    CNN with frequency-attention mechanism for chord classification.
-    
-    This model adds a channel attention mechanism to emphasize
-    important frequency bins for chord recognition.
-    
-    Args:
-        n_bins: Number of CQT frequency bins (default: 72)
-        num_classes: Number of chord classes (default: 24)
-        dropout: Dropout rate for regularization
-    """
-    
-    def __init__(
-        self,
-        n_bins: int = 72,
-        num_classes: int = NUM_CLASSES,
-        dropout: float = 0.5
-    ):
-        super(ChordCNNWithAttention, self).__init__()
-        
-        self.n_bins = n_bins
-        self.num_classes = num_classes
-        
-        # Convolutional blocks
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3), padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.pool1 = nn.MaxPool2d(kernel_size=(2, 2))
-        
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3), padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.pool2 = nn.MaxPool2d(kernel_size=(2, 2))
-        
-        # Channel attention (SE block)
-        self.se_fc1 = nn.Linear(64, 64 // 4)
-        self.se_fc2 = nn.Linear(64 // 4, 64)
-        
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=(3, 3), padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.pool3 = nn.MaxPool2d(kernel_size=(2, 2))
-        
-        self.conv4 = nn.Conv2d(128, 256, kernel_size=(3, 3), padding=1)
-        self.bn4 = nn.BatchNorm2d(256)
-        self.pool4 = nn.MaxPool2d(kernel_size=(2, 2))
-        
-        # Global pooling and classifier
-        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(256, 128)
-        self.dropout1 = nn.Dropout(dropout)
-        self.fc2 = nn.Linear(128, num_classes)
-        
-    def _channel_attention(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply squeeze-and-excitation channel attention."""
-        b, c, h, w = x.size()
-        # Squeeze: global average pooling
-        y = x.view(b, c, -1).mean(dim=2)  # (b, c)
-        # Excitation: FC -> ReLU -> FC -> Sigmoid
-        y = F.relu(self.se_fc1(y))
-        y = torch.sigmoid(self.se_fc2(y))
-        # Scale
-        y = y.view(b, c, 1, 1)
-        return x * y
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Conv blocks 1-2
-        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        
-        # Apply channel attention
-        x = self._channel_attention(x)
-        
-        # Conv blocks 3-4
-        x = self.pool3(F.relu(self.bn3(self.conv3(x))))
-        x = self.pool4(F.relu(self.bn4(self.conv4(x))))
-        
-        # Global pooling and classifier
-        x = self.global_pool(x)
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.dropout1(x)
-        x = self.fc2(x)
-        
-        return x
-    
-    def count_parameters(self) -> int:
-        """Count total trainable parameters."""
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)

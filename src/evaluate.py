@@ -12,13 +12,13 @@ from pathlib import Path
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report
 
-from pytorch_classses import (
+from DataClasses import (
     ChordCQTDataset,
-    ChordCNNWithAttention,
     ALL_CHORDS,
     IDX_TO_CHORD,
     NUM_CLASSES
 )
+from model import ChordCNNWithAttention
 from torch.utils.data import DataLoader
 
 # Config

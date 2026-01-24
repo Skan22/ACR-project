@@ -5,12 +5,12 @@ import torch.optim as optim
 from pathlib import Path
 from tqdm import tqdm
 
-from pytorch_classses import (
-    ChordCNNWithAttention,
+from DataClasses import (
     create_dataloaders,
     IDX_TO_CHORD,
     NUM_CLASSES
 )
+from model import ChordCNNWithAttention
 
 # Config
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -74,9 +74,12 @@ def train():
     
     # Data
     train_loader, val_loader = create_dataloaders(
+        data_dir="./Data",
         batch_size=BATCH_SIZE,
         num_workers=4,
-        n_bins=72
+        n_bins=72,
+        use_kaggle=True,
+        use_guitarset=True
     )
     
     # Model
