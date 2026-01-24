@@ -145,6 +145,34 @@ def process_split(split_name):
         print(f"  Processed {annot_file.name}")
 
 
+def count_samples_per_class():
+    """Count the number of samples in each chord class folder after processing."""
+    print("\n" + "=" * 50)
+    print("Sample Counts Per Class")
+    print("=" * 50)
+    
+    for split in ["Train", "Test", "Validation"]:
+        split_dir = OUTPUT_DIR / split
+        
+        if not split_dir.exists():
+            print(f"\n{split}: Directory not found")
+            continue
+        
+        print(f"\n{split}:")
+        print("-" * 40)
+        
+        # Get all chord folders
+        chord_folders = sorted([d for d in split_dir.iterdir() if d.is_dir()])
+        
+        total = 0
+        for chord_dir in chord_folders:
+            count = len(list(chord_dir.glob("*.wav")))
+            total += count
+            print(f"  {chord_dir.name:8s}: {count:>6,} samples")
+        
+        print("-" * 40)
+        print(f"  {'TOTAL':8s}: {total:>6,} samples")
+        print(f"  Classes: {len(chord_folders)}")
 
 
 # -------- Main Program Execution ---------------
@@ -158,6 +186,6 @@ if __name__ == "__main__":
     # Process each split
     for split in ["Train", "Test", "Validation"]:
         process_split(split)
-
-
     
+    # Count samples per class after processing
+    count_samples_per_class()
