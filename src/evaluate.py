@@ -24,7 +24,7 @@ from torch.utils.data import DataLoader
 # Config
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 CHECKPOINT_PATH = Path('./checkpoints/best_model.pt')
-TEST_DIR = Path('./Data/Test')
+DATA_DIR = Path('./Data')
 BATCH_SIZE = 32
 N_BINS = 72
 
@@ -42,20 +42,23 @@ def load_model(checkpoint_path: Path) -> ChordCNNWithAttention:
     return model
 
 
-def create_test_loader(test_dir: Path, batch_size: int) -> DataLoader:
+def create_test_loader(data_dir: Path, batch_size: int, use_kaggle: bool = True, use_guitarset: bool = True) -> DataLoader:
     """Create test DataLoader."""
     test_dataset = ChordCQTDataset(
-        data_dir=test_dir,
+        data_dir=data_dir,
+        split="Test",
         n_bins=N_BINS,
         hop_length=512,
-        bins_per_octave=12
+        bins_per_octave=12,
+        use_kaggle=use_kaggle,
+        use_guitarset=use_guitarset
     )
     
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=0,  # Set to 0 to avoid issues with nnAudio CQT layer in multiprocessing
         pin_memory=True
     )
     
@@ -217,13 +220,13 @@ def plot_confidence_distribution(confidences: np.ndarray, preds: np.ndarray, tar
 def main():
     print(f"Using device: {DEVICE}")
     print(f"Checkpoint: {CHECKPOINT_PATH}")
-    print(f"Test directory: {TEST_DIR}")
+    print(f"Data directory: {DATA_DIR}")
     
     # Load model
     model = load_model(CHECKPOINT_PATH)
     
     # Create test loader
-    test_loader = create_test_loader(TEST_DIR, BATCH_SIZE)
+    test_loader = create_test_loader(DATA_DIR, BATCH_SIZE)
     
     # Evaluate
     preds, targets, confidences, probs = evaluate(model, test_loader)

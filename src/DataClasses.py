@@ -1,4 +1,5 @@
 import torch
+import torchaudio
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,6 +8,7 @@ import librosa
 from pathlib import Path
 from typing import Tuple, Optional, List
 import matplotlib.pyplot as plt
+from nnAudio.features import CQT
 
 # Constants (matching preprocessing module)
 SAMPLE_RATE = 22050
@@ -49,7 +51,7 @@ class ChordCQTDataset(Dataset):
         bins_per_octave: int = 12,
         fmin: Optional[float] = None,
         transform: Optional[callable] = None,
-        use_hpss: bool = True,
+        use_hpss: bool = False,
         use_kaggle: bool = True,
         use_guitarset: bool = True
     ):
@@ -70,34 +72,52 @@ class ChordCQTDataset(Dataset):
         
         # Collect all audio files and their labels
         self.samples: List[Tuple[Path, int]] = []
-        self._load_samples()
-
-
-    def _compute_cqt(self, audio_path: Path) -> np.ndarray:
-        """Compute the Constant Q Transform of an audio file."""
-        # Load audio
-        y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
         
-        # Apply HPSS to extract harmonic content (removes percussive transients)
-        if self.use_hpss:
-            y_harmonic, _ = librosa.effects.hpss(y)
-        else:
-            y_harmonic = y
-        
-        # Compute CQT on harmonic component
-        cqt = librosa.cqt(
-            y_harmonic,
-            sr=sr,
+        # Initialize nnAudio CQT layer
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.cqt_layer = CQT(
+            sr=SAMPLE_RATE,
             hop_length=self.hop_length,
             fmin=self.fmin,
             n_bins=self.n_bins,
-            bins_per_octave=self.bins_per_octave
-        )
+            bins_per_octave=self.bins_per_octave,
+            output_format='Magnitude',
+        ).to(self.device)
         
-        # Convert to magnitude (absolute value) and then to dB scale
-        cqt_mag = np.abs(cqt)
-        cqt_db = librosa.amplitude_to_db(cqt_mag, ref=np.max)
-        cqt_tensor = torch.tensor(cqt_db, dtype=torch.float32).unsqueeze(0)  # Shape: (1, n_bins, time_frames)
+        self._load_samples()
+
+    def _compute_cqt(self, audio_path: Path) -> torch.Tensor:
+        """Compute the Constant Q Transform of an audio file using torchaudio and nnAudio."""
+        # Load audio using torchaudio
+        waveform, sr = torchaudio.load(audio_path)
+        
+        # Resample if necessary
+        if sr != SAMPLE_RATE:
+            resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=SAMPLE_RATE)
+            waveform = resampler(waveform)
+        
+        # Convert to mono if stereo
+        if waveform.shape[0] > 1:
+            waveform = torch.mean(waveform, dim=0, keepdim=True)
+        
+        # Apply HPSS to extract harmonic content (using librosa, then convert back to tensor) # TO be changed with custom pytorch function 
+        if self.use_hpss:
+            waveform_np = waveform.squeeze(0).numpy()
+            y_harmonic, _ = librosa.effects.hpss(waveform_np)
+            waveform = torch.tensor(y_harmonic, dtype=torch.float32).unsqueeze(0)
+        
+        # Move to device and compute CQT using nnAudio
+        waveform = waveform.to(self.device)
+        
+        # nnAudio CQT expects shape (batch, samples), output is (batch, n_bins, time_frames)
+        with torch.no_grad():
+            cqt_mag = self.cqt_layer(waveform)  # Already magnitude from output_format='Magnitude'
+        
+        # Convert to dB scale
+        cqt_db = torchaudio.transforms.AmplitudeToDB(stype='amplitude', top_db=80)(cqt_mag)
+        
+        # Move back to CPU for storage and return with shape (1, n_bins, time_frames)
+        cqt_tensor = cqt_db.cpu()
         
         return cqt_tensor
 
