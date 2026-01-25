@@ -7,3 +7,4 @@ audio_mono-mic/
 *.wav
 *.zip
 *.png
+*.pyc
