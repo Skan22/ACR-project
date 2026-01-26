@@ -1,6 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cu126
+torch==2.8.0+cu126
+torchaudio==2.8.0+cu126
 asttokens==3.0.1
 audioread==3.1.0
-certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
 comm==0.2.3
@@ -68,8 +70,6 @@ soxr==1.0.0
 stack-data==0.6.3
 sympy==1.14.0
 threadpoolctl==3.6.0
-torch==2.8.0+cu126
-torchaudio==2.8.0+cu126
 tornado==6.5.4
 traitlets==5.14.3
 triton==3.4.0

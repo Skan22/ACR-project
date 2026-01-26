@@ -8,3 +8,4 @@ audio_mono-mic/
 *.zip
 *.png
 *.pyc
+.python-version
