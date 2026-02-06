@@ -9,3 +9,4 @@ audio_mono-mic/
 *.png
 *.pyc
 .python-version
+JuceLibraryCode
